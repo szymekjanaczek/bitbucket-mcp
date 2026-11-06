@@ -38,7 +38,11 @@ vi.mock('../../../src/api/endpoints/pull-requests.js', () => ({
     createComment: mockCreateComment,
     updateComment: mockUpdateComment,
     deleteComment: mockDeleteComment,
-    getDiff: vi.fn().mockResolvedValue('diff output'),
+    getDiff: vi
+      .fn()
+      .mockResolvedValue(
+        'diff --git a/src/a.ts b/src/a.ts\n+a\ndiff --git a/docs/b.md b/docs/b.md\n+b\n'
+      ),
   })),
 }));
 
@@ -235,6 +239,33 @@ describe('Pull Request Tools', () => {
       expect(result.content[0].text).toContain('abc123def456');
       expect(result.content[0].text).toContain('0123456789ab');
       expect(result.content[0].text).not.toContain('rendered');
+    });
+  });
+
+  describe('get_diff path filter', () => {
+    it('should return only the files under the path', async () => {
+      const result = await handler({
+        action: 'get_diff',
+        workspace: 'test-ws',
+        repo_slug: 'test-repo',
+        pr_id: 1,
+        path: 'docs',
+      });
+
+      expect(result.content[0].text).toBe('diff --git a/docs/b.md b/docs/b.md\n+b\n');
+    });
+
+    it('should say so when no file matches', async () => {
+      const result = await handler({
+        action: 'get_diff',
+        workspace: 'test-ws',
+        repo_slug: 'test-repo',
+        pr_id: 1,
+        path: 'missing',
+      });
+
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toBe('No changes under missing in this pull request');
     });
   });
 

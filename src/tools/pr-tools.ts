@@ -6,6 +6,7 @@ import { paginateResult } from '../utils/pagination.js';
 import { formatOutput, type OutputFormat } from '../utils/output-formatter.js';
 import { PR_COMPACT_FIELDS, PR_COMMENT_COMPACT_FIELDS } from '../utils/compact-fields.js';
 import { type Config } from '../config/settings.js';
+import { filterDiffByPath } from '../utils/diff-filter.js';
 
 /**
  * Register consolidated pull request tool
@@ -34,7 +35,7 @@ export function registerPullRequestTools(
 - add_comment: Add a comment to a pull request
 - update_comment: Edit a comment on a pull request
 - delete_comment: Delete a comment on a pull request
-- get_diff: Get the diff of a pull request`,
+- get_diff: Get the diff of a pull request (use path to return only one file or directory)`,
     {
       action: z
         .enum([
@@ -100,6 +101,11 @@ export function registerPullRequestTools(
         .optional()
         .describe('Line number for inline comment (requires inline_path)'),
       parent_id: z.number().optional().describe('Parent comment ID for replies'),
+      // For get_diff action
+      path: z
+        .string()
+        .optional()
+        .describe('Return only the diff of this file, or of the files under this directory'),
       // Pagination
       page: z.number().optional().describe('Page number for pagination'),
       pagelen: z.number().optional().describe('Results per page (default: 25, max 100)'),
@@ -469,6 +475,17 @@ export function registerPullRequestTools(
               };
             }
             const result = await prApi.getDiff(workspace, repo_slug, pr_id);
+            if (params.path) {
+              const filtered = filterDiffByPath(result, params.path);
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: filtered || `No changes under ${params.path} in this pull request`,
+                  },
+                ],
+              };
+            }
             return {
               content: [{ type: 'text' as const, text: result }],
             };
