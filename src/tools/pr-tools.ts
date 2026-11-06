@@ -32,6 +32,8 @@ export function registerPullRequestTools(
 - decline: Decline a pull request
 - list_comments: List comments on a pull request
 - add_comment: Add a comment to a pull request
+- update_comment: Edit a comment on a pull request
+- delete_comment: Delete a comment on a pull request
 - get_diff: Get the diff of a pull request`,
     {
       action: z
@@ -48,6 +50,8 @@ export function registerPullRequestTools(
           'decline',
           'list_comments',
           'add_comment',
+          'update_comment',
+          'delete_comment',
           'get_diff',
         ])
         .describe('Action to perform'),
@@ -83,8 +87,10 @@ export function registerPullRequestTools(
         .optional()
         .describe('Merge strategy'),
       message: z.string().optional().describe('Merge commit message'),
-      // For add_comment action
+      // For add_comment / update_comment action
       content: z.string().optional().describe('Comment content (markdown supported)'),
+      // For update_comment / delete_comment action
+      comment_id: z.number().optional().describe('Comment ID to update or delete'),
       inline_path: z
         .string()
         .optional()
@@ -403,6 +409,53 @@ export function registerPullRequestTools(
                   text: formatOutput(result, format, PR_COMMENT_COMPACT_FIELDS),
                 },
               ],
+            };
+          }
+
+          case 'update_comment': {
+            if (!pr_id || !params.comment_id || !params.content) {
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: 'Error: pr_id, comment_id and content are required for update_comment action',
+                  },
+                ],
+                isError: true,
+              };
+            }
+            const result = await prApi.updateComment(
+              workspace,
+              repo_slug,
+              pr_id,
+              params.comment_id,
+              params.content
+            );
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: formatOutput(result, format, PR_COMMENT_COMPACT_FIELDS),
+                },
+              ],
+            };
+          }
+
+          case 'delete_comment': {
+            if (!pr_id || !params.comment_id) {
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: 'Error: pr_id and comment_id are required for delete_comment action',
+                  },
+                ],
+                isError: true,
+              };
+            }
+            await prApi.deleteComment(workspace, repo_slug, pr_id, params.comment_id);
+            return {
+              content: [{ type: 'text' as const, text: 'Comment deleted successfully' }],
             };
           }
 
