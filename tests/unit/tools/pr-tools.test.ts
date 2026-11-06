@@ -6,6 +6,14 @@ import type { Config } from '../../../src/config/settings.js';
 
 const mockList = vi.fn().mockResolvedValue({ values: [], page: 1, pagelen: 25, size: 0 });
 const mockCreate = vi.fn().mockResolvedValue({ id: 2, title: 'Test PR', state: 'OPEN' });
+const mockGet = vi.fn().mockResolvedValue({
+  id: 1,
+  title: 'Test PR',
+  state: 'OPEN',
+  source: { branch: { name: 'feature/x' }, commit: { hash: 'abc123def456' } },
+  destination: { branch: { name: 'main' }, commit: { hash: '0123456789ab' } },
+  rendered: { description: { html: '<p>long</p>' } },
+});
 const mockCreateComment = vi.fn().mockResolvedValue({ id: 10, content: { raw: 'test' } });
 const mockRequestChanges = vi
   .fn()
@@ -17,7 +25,7 @@ const mockDeleteComment = vi.fn().mockResolvedValue(undefined);
 vi.mock('../../../src/api/endpoints/pull-requests.js', () => ({
   PullRequestsAPI: vi.fn().mockImplementation(() => ({
     list: mockList,
-    get: vi.fn().mockResolvedValue({ id: 1, title: 'Test PR', state: 'OPEN' }),
+    get: mockGet,
     create: mockCreate,
     update: vi.fn().mockResolvedValue({ id: 1 }),
     merge: vi.fn().mockResolvedValue({ id: 1, state: 'MERGED' }),
@@ -211,6 +219,22 @@ describe('Pull Request Tools', () => {
 
       expect(result.isError).toBe(true);
       expect(mockDeleteComment).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('compact output', () => {
+    it('should include the source and destination commit hashes', async () => {
+      const result = await handler({
+        action: 'get',
+        workspace: 'test-ws',
+        repo_slug: 'test-repo',
+        pr_id: 1,
+        format: 'compact',
+      });
+
+      expect(result.content[0].text).toContain('abc123def456');
+      expect(result.content[0].text).toContain('0123456789ab');
+      expect(result.content[0].text).not.toContain('rendered');
     });
   });
 
